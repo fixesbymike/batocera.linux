@@ -45,12 +45,30 @@ class DosBoxxGenerator(Generator):
 
         # -fullscreen removed as it crashes on N2
         commandArray = ['/usr/bin/dosbox-x',
-                        "-exit",
-                        "-c", f"""mount c {rom!s}""",
-                        "-c", "c:",
-                        "-c", "dosbox.bat",
-                        "-fastbioslogo",
-                        "-conf", f"{customConfFile!s}"]
+                        "-exit"]
+
+        # Mounting decisions:
+        # 1. If the directory contains a .img file, we guess that it is a bootable dosbox hdd img file. We mount it as c: and we'll boot from there.
+        # 2. Otherwise, we mount the directory as c: drive and run dosbox.bat
+        # 3. If the directory contains a .iso file, we mount it as d: drive
+        mountDDrive = []
+        for file in rom.iterdir():
+            if file.suffix in [".iso", ".cue", ".mdf", ".chd"]:
+                mountDDrive = ["-c", f"""imgmount d {file!s}"""]
+        commandArray.extend(mountDDrive)
+
+        mountCDrive = ["-c", f"""mount c {rom!s}""",
+                       "-c", "c:",
+                       "-c", "dosbox.bat"]
+        for file in rom.iterdir():
+            if file.suffix in [".img", ".qcow2", ".vhd", ".nhd", ".hdi"]:
+                mountCDrive = ["-c", f"""imgmount c {file!s}""",
+                               "-c", "boot c:"]
+        commandArray.extend(mountCDrive)
+
+        # Other options
+        commandArray.extend(["-fastbioslogo",
+                             "-conf", f"{customConfFile!s}"]
 
         return Command.Command(array=commandArray, env={"XDG_CONFIG_HOME":CONFIGS})
 
